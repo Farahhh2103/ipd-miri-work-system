@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Semakan Kerja IPD Miri</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #f8fafc; color: #1e293b; -webkit-text-size-adjust: 100%; }
+        select.status-select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right .65rem center; background-size: 1rem; padding-right: 2rem; }
+        .photo-slot { min-width: 88px; }
+        .photo-preview { width: 72px; height: 54px; object-fit: cover; }
+        .debug { position: fixed; left: 1rem; bottom: 1rem; background: rgba(0,0,0,0.7); color: #fff; padding: 8px 10px; border-radius: 6px; font-size:12px; z-index:60; max-width: 320px; }
+        @media print {
+            @page { size: A4 landscape; margin: 10mm; }
+            body { background: #fff !important; color: #000 !important; }
+            body > * { display: none !important; }
+            #fullModal { display: block !important; position: static !important; inset: auto !important; padding: 0 !important; background: #fff !important; overflow: visible !important; }
+            #fullModal .modal-shell { display: block !important; width: 100% !important; max-width: none !important; max-height: none !important; overflow: visible !important; border: 0 !important; box-shadow: none !important; }
+            #fullModal .no-print, .no-print { display: none !important; }
+            #fullModal .report-scroll { display: block !important; overflow: visible !important; padding: 0 !important; }
+            #fullTableContainer { display: block !important; }
+            .report-flat { break-before: auto; page-break-inside: auto; margin: 0 0 8mm; }
+            .report-room { break-inside: avoid; page-break-inside: avoid; border: 1px solid #555 !important; margin: 0 0 5mm !important; }
+            .report-category { break-inside: avoid; page-break-inside: avoid; }
+            .report-photo { width: 62mm !important; height: 43mm !important; object-fit: contain !important; background: #f1f5f9 !important; }
+            table { border-collapse: collapse !important; width: 100% !important; }
+            th, td { color: #000 !important; border-color: #333 !important; }
+            img { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        }
+    </style>
+</head>
+<body class="min-h-screen pb-12">
+    <header class="bg-slate-950 text-white shadow-xl border-b-4 border-yellow-400 no-print">
+        <div class="max-w-7xl mx-auto px-4 py-5 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-4">
+                <div class="bg-red-600 p-3 rounded-xl border-2 border-yellow-400"><i class="fa-solid fa-building-shield text-3xl"></i></div>
+                <div><span class="bg-red-600 text-white font-extrabold text-xs px-3 py-1 rounded-full uppercase border border-yellow-400">IPD Miri, Sarawak</span><h1 class="text-xl sm:text-2xl font-extrabold mt-2">Sistem Semakan Kerja Pembaikan Kuarters &amp; Flat</h1></div>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap justify-center">
+                <span class="bg-emerald-700 text-white font-bold text-xs px-3 py-2 rounded-lg"><i class="fa-solid fa-cloud-arrow-up text-yellow-300"></i> Auto-Save</span>
+                <button onclick="manualSaveData()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-3 rounded-lg"><i class="fa-solid fa-floppy-disk mr-2"></i>Simpan Data</button>
+                <button onclick="openFullModal()" class="bg-blue-700 hover:bg-blue-800 text-white font-bold px-4 py-3 rounded-lg"><i class="fa-solid fa-table mr-2"></i>Penyata / Cetak</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-7">
+        <section class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-7 no-print">
+            <div class="bg-white p-5 shadow-sm border-t-4 border-red-600"><p class="text-xs font-bold text-slate-500 uppercase">Jumlah Unit</p><p id="totalUnits" class="text-3xl font-extrabold mt-1">0</p></div>
+            <div class="bg-white p-5 shadow-sm border-t-4 border-yellow-500"><p class="text-xs font-bold text-slate-500 uppercase">Unit Siap 100%</p><p id="totalCompleted" class="text-3xl font-extrabold text-blue-700 mt-1">0</p></div>
+            <div class="bg-white p-5 shadow-sm border-t-4 border-slate-900 flex justify-between items-center">
+                <div>
+                    <p class="text-xs font-bold text-slate-500 uppercase">Purata Kerja Siap</p>
+                    <p id="overallPercentage" class="text-3xl font-extrabold text-red-600 mt-1">0.00%</p>
+                </div>
+                <div class="w-16 h-16 relative flex items-center justify-center">
+                    <svg class="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                        <path class="text-slate-900" stroke-width="4" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                        <path id="pieProgressPath" class="text-rose-500 transition-all duration-500" stroke-dasharray="0, 100" stroke-width="4" stroke-linecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                    </svg>
+                    <div class="absolute inset-0 flex items-center justify-center text-[10px] font-extrabold text-slate-900" id="piePercentText">0%</div>
+                </div>
+            </div>
+        </section>
+        <div id="flatsContainer" class="space-y-4 no-print"></div>
+    </main>
+
+    <div id="fullModal" class="fixed inset-0 z-50 hidden bg-slate-900/80 flex items-center justify-center p-2 sm:p-4">
+        <div class="modal-shell bg-white rounded-xl shadow-2xl w-full max-w-7xl max-h-[95vh] flex flex-col overflow-hidden">
+            <div class="no-print bg-slate-950 text-white px-5 py-4 flex justify-between items-center gap-3 border-b-4 border-yellow-400">
+                <div><h2 class="font-extrabold text-lg">Penyata Rekod Kerja dan Foto</h2><p class="text-xs text-yellow-300">Imej sebelum, semasa dan selepas mengikut unit dan jenis kerja</p></div>
+                <div class="flex gap-2"><button onclick="printFullTable()" class="bg-emerald-600 text-white font-bold px-4 py-2 rounded-lg"><i class="fa-solid fa-print mr-2"></i>Cetak</button><button onclick="closeFullModal()" aria-label="Tutup" class="bg-red-600 text-white w-10 rounded-lg"><i class="fa-solid fa-xmark"></i></button></div>
+            </div>
+            <div class="no-print bg-slate-100 px-5 py-3 flex flex-wrap gap-3 items-center border-b">
+                <input id="tableSearchInput" oninput="renderFullTableRows()" type="search" placeholder="Cari nama flat atau no. bilik..." class="border border-slate-300 bg-white px-3 py-2 rounded-lg text-sm flex-1 min-w-48">
+                <select id="tableFlatFilter" onchange="renderFullTableRows()" class="border border-slate-300 bg-white px-3 py-2 rounded-lg text-sm"><option value="">Semua Flat</option></select>
+                <span id="modalTotalUnits" class="font-bold text-xs text-slate-600"></span>
+            </div>
+            <div class="report-scroll overflow-y-auto flex-1 p-4 sm:p-6">
+                <div id="printHeading" class="mb-5 border-2 border-slate-900 p-4 text-xs sm:text-sm font-bold space-y-1">
+                    <p>TAJUK KERJA: KERJA-KERJA PEMBAIKAN AM DI KUARTERS DAN FLAT IBU PEJABAT POLIS DAERAH MIRI, SARAWAK</p>
+                    <p>TARIKH KELUAR LPO: 5.8.2026</p><p>TARIKH SIAP KERJA DALAM LPO: 5.11.2026</p><p>TARIKH MASUK KERJA: 18.8.2026</p>
+                </div>
+                <div id="fullTableContainer"></div>
+            </div>
+            <div class="no-print bg-slate-100 px-5 py-3 border-t flex justify-between items-center"><span class="text-xs text-slate-600">Status disimpan pada peranti dan disegerakkan ke Firebase jika tersedia. Foto disimpan dalam storan browser peranti ini.</span><button onclick="closeFullModal()" class="bg-slate-900 text-white font-bold px-5 py-2 rounded-lg">Tutup</button></div>
+        </div>
+    </div>
+
+    <div id="saveToast" class="fixed bottom-5 right-5 z-50 hidden bg-slate-950 border border-emerald-500 text-white px-5 py-3 rounded-lg shadow-xl"><i class="fa-solid fa-circle-check text-emerald-400 mr-2"></i>Rekod berjaya disimpan.</div>
+    <div id="debug" class="debug" aria-hidden="false">Debug: loading...</div>
+    <footer class="text-center py-7 text-xs font-bold text-slate-500 mt-10 border-t border-slate-200 no-print">&copy; 2026 Sistem Pembaikan Kuarters &amp; Flat IPD Miri</footer>
+
+    <!-- IMPORTANT: Replace the placeholder values in `firebaseConfig` below with your Firebase project's web config (from Firebase Console -> Project settings -> Web SDK config). -->
+    <script type="module">
+        // Firebase + app logic (autosync improvements)
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp, updateDoc, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+
+        const debugEl = document.getElementById('debug');
+        function debug(msg) { try { debugEl.textContent = 'Debug: ' + msg; console.log(msg); } catch(e){} }
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'ipd-miri-work-system-v2.5';
+        // <<< REPLACE THESE VALUES with your Firebase Web SDK config >>>
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            apiKey: "REPLACE_ME",
+            authDomain: "REPLACE_ME.firebaseapp.com",
+            projectId: "REPLACE_ME",
+            storageBucket: "REPLACE_ME.appspot.com",
+            messagingSenderId: "REPLACE_ME",
+            appId: "REPLACE_ME"
+        };
+
+        const flatOrder = ["FLAT IKAN PITANG","FLAT IKAN KERAPU","FLAT IKAN SEMBILANG","FLAT IKAN BAONG","FLAT IKAN BELIDA","FLAT IKAN EMPURAU","FLAT IKAN KULONG","FLAT IKAN SEMAH","FLAT IKAN SENANGIN","FLAT IKAN TENGGIRI","FLAT IKAN BUING","FLAT IKAN KALOI","FLAT IKAN TENGGADAK","FLAT IKAN PARI","FLAT IKAN YU","FLAT BUNGA RAYA","FLAT BUNGA SIANTAN"];
+        const categories = [{ key: "civil", label: "Kerja Awam & Struktur" },{ key: "plumbing", label: "Kerja Paip & Sanitari" },{ key: "wood", label: "Kerja Kayu" },{ key: "balcony", label: "Pembaikan Balkoni" }];
+        const phases = [{ key: "before", label: "Imej Sebelum" }, { key: "during", label: "Imej Semasa" }, { key: "after", label: "Imej Selepas" }];
+        const initialData = [
+            { flatName: "FLAT IKAN PITANG", rooms: [ { id: "pitang_d3_2", roomNo: "D3-2", civil: "siap", plumbing: "siap", wood: "siap", balcony: "siap" },{ id: "pitang_dg_2", roomNo: "DG-2", civil: "in_process", plumbing: "belum", wood: "belum", balcony: "belum" },{ id: "pitang_d2_2", roomNo: "D2-2", civil: "in_process", plumbing: "siap", wood: "siap", balcony: "siap" },{ id: "pitang_d1_2", roomNo: "D1-2", civil: "siap", plumbing: "siap", wood: "in_process", balcony: "in_process" } ] },
+            { flatName: "FLAT IKAN KERAPU", rooms: [ { id: "kerapu_a2_1", roomNo: "A2-1", civil: "belum", plumbing: "belum", wood: "belum", balcony: "siap" },{ id: "kerapu_a2_2", roomNo: "A2-2", civil: "siap", plumbing: "siap", wood: "in_process", balcony: "in_process" },{ id: "kerapu_a1_1", roomNo: "A1-1", civil: "belum", plumbing: "belum", wood: "belum", balcony: "siap" } ] },
+            { flatName: "FLAT IKAN SEMBILANG", rooms: [ { id: "sembilang_c1_1", roomNo: "C1-1", civil: "in_process", plumbing: "in_process", wood: "in_process", balcony: "siap" },{ id: "sembilang_c2_2", roomNo: "C2-2", civil: "siap", plumbing: "in_process", wood: "siap", balcony: "siap" },{ id: "sembilang_c1_2", roomNo: "C1-2", civil: "siap", plumbing: "in_process", wood: "in_process", balcony: "siap" },{ id: "sembilang_cg_1_2", roomNo: "CG-1-2", civil: "belum", plumbing: "belum", wood: "belum", balcony: "belum" },{ id: "sembilang_c3_2", roomNo: "C3-2", civil: "in_process", plumbing: "in_process", wood: "siap", balcony: "siap" } ] },
+            { flatName: "FLAT IKAN BAONG", rooms: [ { id: "baong_b1_1", roomNo: "B1-1", civil: "belum", plumbing: "belum", wood: "belum", balcony: "siap" },{ id: "baong_bg_1", roomNo: "BG-1", civil: "belum", plumbing: "belum", wood: "belum", balcony: "belum" } ] },
+        ];
+
+        const storageKey = 'ipd_miri_work_records_v2';
+        let appData = loadSavedData();
+        let openFlats = {};
+        let db;
+        let firestore;
+        let auth;
+        let storage;
+        const photoUrls = new Map();
+        const imageDbReady = openImageDatabase();
+        let firestoreDocRef = null;
+        let firestoreUnsubscribe = null;
+
+        function loadSavedData() {
+            try {
+                const saved = JSON.parse(localStorage.getItem(storageKey) || 'null');
+                if (!Array.isArray(saved)) return structuredClone(initialData);
+                return flatOrder.map(name => {
+                    const seed = initialData.find(flat => flat.flatName === name);
+                    const oldFlat = saved.find(flat => flat.flatName === name);
+                    if (!seed) return oldFlat;
+                    const rooms = seed.rooms.map(seedRoom => {
+                        const oldRoom = oldFlat?.rooms?.find(room => room.id === seedRoom.id);
+                        return oldRoom ? { ...seedRoom, ...oldRoom, lastUpdated: oldRoom.lastUpdated || 0 } : { ...seedRoom, lastUpdated: 0 };
+                    });
+                    return { ...seed, ...(oldFlat || {}), flatName: name, rooms };
+                });
+            } catch (error) {
+                console.warn('Data tempatan tidak dapat dibaca:', error);
+                return structuredClone(initialData);
+            }
+        }
+
+        function openImageDatabase() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open('ipd-miri-work-photos', 1);
+                request.onupgradeneeded = () => request.result.createObjectStore('photos', { keyPath: 'key' });
+                request.onsuccess = () => { db = request.result; resolve(db); };
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        function photoKey(roomId, category, phase) { return `${roomId}__${category}__${phase}`; }
+
+        async function loadPhotoUrls() {
+            const imageDb = await imageDbReady;
+            return new Promise((resolve, reject) => {
+                const request = imageDb.transaction('photos').objectStore('photos').getAll();
+                request.onsuccess = async () => {
+                    for (const record of request.result) photoUrls.set(record.key, URL.createObjectURL(record.blob));
+                    resolve();
+                };
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        // build roomsMap snapshot from appData
+        function buildRoomsMapForWrite() {
+            const map = {};
+            appData.forEach(flat => {
+                flat.rooms.forEach(room => {
+                    map[room.id] = {
+                        flatName: flat.flatName,
+                        roomNo: room.roomNo,
+                        civil: room.civil,
+                        plumbing: room.plumbing,
+                        wood: room.wood,
+                        balcony: room.balcony,
+                        lastUpdated: serverTimestamp()
+                    };
+                });
+            });
+            return map;
+        }
+
+        async function persistRoomToServer(room) {
+            if (!firestore || !firestoreDocRef) return;
+            try {
+                await updateDoc(firestoreDocRef, {
+                    [`roomsMap.${room.id}`]: {
+                        flatName: room.flatName,
+                        roomNo: room.roomNo,
+                        civil: room.civil,
+                        plumbing: room.plumbing,
+                        wood: room.wood,
+                        balcony: room.balcony,
+                        lastUpdated: serverTimestamp()
+                    },
+                    updatedAt: serverTimestamp()
+                });
+            } catch (e) {
+                try {
+                    await setDoc(firestoreDocRef, { roomsMap: { [room.id]: { flatName: room.flatName, roomNo: room.roomNo, civil: room.civil, plumbing: room.plumbing, wood: room.wood, balcony: room.balcony, lastUpdated: serverTimestamp() } }, updatedAt: serverTimestamp() }, { merge: true });
+                } catch (err) {
+                    console.warn('persistRoomToServer error', err);
+                    debug('Sync error');
+                }
+            }
+        }
+
+        async function persistStatuses() {
+            localStorage.setItem(storageKey, JSON.stringify(appData));
+            if (!firestore || !firestoreDocRef) return;
+            try {
+                await setDoc(firestoreDocRef, { roomsMap: buildRoomsMapForWrite(), updatedAt: serverTimestamp() }, { merge: true });
+                debug('Synced full snapshot');
+            } catch (error) {
+                console.warn('Status tidak dapat disegerakkan ke Firebase:', error);
+                debug('Sync failed');
+            }
+        }
+
+        function score(status) { return status === 'siap' ? 25 : status === 'in_process' ? 12.5 : 0; }
+        function statusClass(status) { return status === 'siap' ? 'bg-emerald-600' : status === 'in_process' ? 'bg-amber-600' : 'bg-rose-600'; }
+        function statusLabel(status) { return status === 'siap' ? 'Siap' : status === 'in_process' ? 'Dalam Proses' : 'Belum Buat'; }
+        function escapeHtml(value) { return String(value).replace(/[&<>"]'/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]); }
+
+        function renderPhotoSlot(room, category, phase) {
+            const key = photoKey(room.id, category.key, phase.key);
+            const url = photoUrls.get(key);
+            const inputId = `upload-${key}`;
+            return `<div class="photo-slot border border-slate-200 rounded-lg p-2 bg-white text-center">
+                ${url ? `<img class="photo-preview mx-auto rounded object-cover report-photo" src="${url}" alt="${phase.label}:${escapeHtml(room.roomNo)}">` : `<div class="photo-preview mx-auto rounded bg-slate-100 flex items-center justify-center text-slate-400"><i class="fa-regular fa-image"></i></div>`}
+                <label for="${inputId}" class="block mt-1 text-[10px] leading-tight font-bold text-blue-800 cursor-pointer hover:underline">${phase.label}</label>
+                <input id="${inputId}" type="file" accept="image/*" class="sr-only" onchange="uploadImage('${room.id}','${category.key}','${phase.key}',this)">
+            </div>`;
+        }
+
+        function renderApp() {
+            const container = document.getElementById('flatsContainer');
+            let totalUnits = 0, completedUnits = 0, totalPercentage = 0;
+            container.innerHTML = '';
+            appData = flatOrder.map(name => appData.find(flat => flat.flatName === name)).filter(Boolean);
+            appData.forEach((flat, flatIndex) => {
+                let flatScore = 0;
+                flat.rooms.forEach(room => {
+                    if (typeof room.lastUpdated === 'undefined') room.lastUpdated = 0;
+                    const roomScore = categories.reduce((sum, category) => sum + score(room[category.key]), 0);
+                    totalUnits++;
+                    flatScore += roomScore;
+                    totalPercentage += roomScore;
+                    if (roomScore === 100) completedUnits++;
+                });
+                const average = flat.rooms.length ? flatScore / flat.rooms.length : 0;
+                const isOpen = !!openFlats[flat.flatName];
+                const article = document.createElement('section');
+                article.className = 'bg-white border border-slate-200 shadow-sm overflow-hidden';
+                article.innerHTML = `
+                    <button onclick="toggleFlat('${flat.flatName}')" class="w-full px-5 py-4 bg-slate-900 text-white flex justify-between items-center gap-3 text-left hover:bg-slate-800">
+                        <span class="flex items-center gap-3"><span class="bg-red-600 border border-yellow-400 px-3 py-1 rounded-full text-xs font-bold">${flat.rooms.length} Unit</span><span class="font-extrabold">${flat.flatName}</span></span>
+                        <span class="flex items-center gap-3"><span class="text-xs font-bold text-yellow-300">Purata ${average.toFixed(1)}%</span><i class="fa-solid fa-chevron-down transition-transform ${isOpen ? 'rotate-180' : ''}"></i></span>
+                    </button>
+                    <div class="${isOpen ? '' : 'hidden'} p-3 sm:p-5 bg-slate-50">
+                        <div class="overflow-x-auto">
+                            <table class="w-full min-w-[1120px] text-left border-collapse">
+                                <thead><tr class="bg-slate-200 text-slate-700 text-xs uppercase"><th class="p-3">Bilik / Unit</th>${categories.map(category => `<th class="p-3 min-w-[220px]">${category.label}</th>`).join('')}<th class="p-3 text-center">Peratusan</th></tr></thead>
+                                <tbody>${flat.rooms.map((room, roomIndex) => {
+                                    const roomScore = categories.reduce((sum, category) => sum + score(room[category.key]), 0);
+                                    return `<tr class="border-b border-slate-200 bg-white align-top">
+                                        <td class="p-3 font-extrabold whitespace-nowrap"><i class="fa-solid fa-door-closed text-red-600 mr-2"></i>${escapeHtml(room.roomNo)}</td>${categories.map(category => `<td class="p-2"><select aria-label="${category.label} ${escapeHtml(room.roomNo)}" onchange="updateStatus(${flatIndex},${roomIndex},'${category.key}',this.value)" class="status-select w-full p-2 rounded-lg text-white text-xs font-bold ${statusClass(room[category.key])}"><option value="belum" ${room[category.key] === 'belum' ? 'selected' : ''}>Belum buat (0%)</option><option value="in_process" ${room[category.key] === 'in_process' ? 'selected' : ''}>Dalam proses (12.5%)</option><option value="siap" ${room[category.key] === 'siap' ? 'selected' : ''}>Siap (25%)</option></select><div class="grid grid-cols-3 gap-1 mt-2">${phases.map(phase => renderPhotoSlot(room, category, phase)).join('')}</div></td>`).join('')}
+                                        <td class="p-3 text-center"><span class="inline-block bg-slate-900 text-yellow-300 px-3 py-1 rounded-lg text-xs font-extrabold">${roomScore}%</span></td>
+                                    </tr>`;
+                                }).join('')}</tbody>
+                            </table>
+                        </div>
+                    </div>`;
+                container.appendChild(article);
+            });
+            const overall = totalUnits ? totalPercentage / totalUnits : 0;
+            document.getElementById('totalUnits').textContent = totalUnits;
+            document.getElementById('totalCompleted').textContent = completedUnits;
+            document.getElementById('overallPercentage').textContent = overall.toFixed(2) + '%';
+            document.getElementById('pieProgressPath').setAttribute('stroke-dasharray', `${overall.toFixed(1)}, 100`);
+            document.getElementById('piePercentText').textContent = Math.round(overall) + '%';
+        }
+
+        function mergeRemoteRoomsMap(remoteRoomsMap) {
+            if (!remoteRoomsMap || typeof remoteRoomsMap !== 'object') return;
+            appData = flatOrder.map(name => appData.find(f => f.flatName === name)).filter(Boolean);
+            Object.entries(remoteRoomsMap).forEach(([roomId, remoteRoom]) => {
+                const flat = appData.find(f => f.flatName === remoteRoom.flatName);
+                if (!flat) return;
+                const localRoom = flat.rooms.find(r => r.id === roomId);
+                if (!localRoom) return;
+                const remoteTS = (remoteRoom.lastUpdated && typeof remoteRoom.lastUpdated.toMillis === 'function') ? remoteRoom.lastUpdated.toMillis() : (typeof remoteRoom.lastUpdated === 'number' ? remoteRoom.lastUpdated : 0);
+                const localTS = localRoom.lastUpdated || 0;
+                if (remoteTS > localTS) {
+                    localRoom.civil = remoteRoom.civil || localRoom.civil;
+                    localRoom.plumbing = remoteRoom.plumbing || localRoom.plumbing;
+                    localRoom.wood = remoteRoom.wood || localRoom.wood;
+                    localRoom.balcony = remoteRoom.balcony || localRoom.balcony;
+                    localRoom.lastUpdated = remoteTS;
+                }
+            });
+            localStorage.setItem(storageKey, JSON.stringify(appData));
+            renderApp();
+            if (!document.getElementById('fullModal').classList.contains('hidden')) renderFullTableRows();
+        }
+
+        async function fetchAndCacheRemotePhoto(key, url) {
+            try {
+                const imageDb = await imageDbReady;
+                const res = await fetch(url, { mode: 'cors' });
+                if (!res.ok) return;
+                const blob = await res.blob();
+                await new Promise((resolve, reject) => {
+                    const tx = imageDb.transaction('photos', 'readwrite');
+                    const store = tx.objectStore('photos');
+                    store.put({ key, blob, name: key, updatedAt: Date.now() });
+                    tx.oncomplete = resolve;
+                    tx.onerror = () => reject(tx.error);
+                });
+                const oldUrl = photoUrls.get(key);
+                if (oldUrl && typeof oldUrl === 'string' && oldUrl.startsWith('blob:')) URL.revokeObjectURL(oldUrl);
+                const objUrl = URL.createObjectURL(blob);
+                photoUrls.set(key, objUrl);
+                renderApp();
+                if (!document.getElementById('fullModal').classList.contains('hidden')) renderFullTableRows();
+            } catch (e) {
+                console.warn('Failed to fetch/cache remote photo', key, e);
+            }
+        }
+
+        function applyRemotePhotos(remotePhotos) {
+            if (!remotePhotos || typeof remotePhotos !== 'object') return;
+            Object.entries(remotePhotos).forEach(([key, meta]) => {
+                if (!meta || !meta.url) return;
+                if (!photoUrls.has(key)) {
+                    photoUrls.set(key, meta.url);
+                    renderApp();
+                    fetchAndCacheRemotePhoto(key, meta.url);
+                } else {
+                    const existing = photoUrls.get(key);
+                    if (typeof existing === 'string' && !existing.startsWith('blob:') && existing !== meta.url) {
+                        photoUrls.set(key, meta.url);
+                        fetchAndCacheRemotePhoto(key, meta.url);
+                    }
+                }
+            });
+        }
+
+        window.toggleFlat = function(flatName) { openFlats[flatName] = !openFlats[flatName]; renderApp(); };
+        window.updateStatus = async function(flatIndex, roomIndex, field, value) {
+            const flat = appData[flatIndex];
+            const room = flat.rooms[roomIndex];
+            room[field] = value;
+            room.lastUpdated = Date.now();
+            room.flatName = flat.flatName;
+            openFlats[flat.flatName] = true;
+            localStorage.setItem(storageKey, JSON.stringify(appData));
+            try { await persistRoomToServer(room); debug('Updated room '+room.id); } catch(e) { debug('Update failed'); }
+            renderApp();
+            if (!document.getElementById('fullModal').classList.contains('hidden')) renderFullTableRows();
+        };
+
+        window.uploadImage = async function(roomId, category, phase, input) {
+            const file = input.files?.[0];
+            if (!file) return;
+            if (!file.type.startsWith('image/')) { alert('Sila pilih fail imej.'); input.value = ''; return; }
+            const key = photoKey(roomId, category, phase);
+            try {
+                const imageDb = await imageDbReady;
+                await new Promise((resolve, reject) => {
+                    const request = imageDb.transaction('photos', 'readwrite').objectStore('photos').put({ key, blob: file, name: file.name, updatedAt: Date.now() });
+                    request.onsuccess = resolve;
+                    request.onerror = () => reject(request.error);
+                });
+                const oldUrl = photoUrls.get(key);
+                if (oldUrl && typeof oldUrl === 'string' && oldUrl.startsWith('blob:')) URL.revokeObjectURL(oldUrl);
+                const localUrl = URL.createObjectURL(file);
+                photoUrls.set(key, localUrl);
+                renderApp();
+                if (!document.getElementById('fullModal').classList.contains('hidden')) renderFullTableRows();
+
+                if (storage && firestore && firestoreDocRef) {
+                    try {
+                        const sRef = storageRef(storage, `images/${appId}/${key}`);
+                        await uploadBytes(sRef, file);
+                        const url = await getDownloadURL(sRef);
+                        await updateDoc(firestoreDocRef, { [`photos.${key}`]: { url, updatedAt: serverTimestamp() }, updatedAt: serverTimestamp() });
+                    } catch (e) { console.warn('Gagal muat naik imej ke Firebase Storage:', e); debug('Image upload failed'); }
+                }
+            } catch (error) {
+                console.error(error);
+                alert('Imej tidak dapat disimpan. Semak ruang storan browser dan cuba imej yang lebih kecil.');
+            } finally { input.value = ''; }
+        };
+
+        window.removePhoto = async function(roomId, category, phase) {
+            const key = photoKey(roomId, category, phase);
+            const imageDb = await imageDbReady;
+            await new Promise((resolve, reject) => {
+                const request = imageDb.transaction('photos', 'readwrite').objectStore('photos').delete(key);
+                request.onsuccess = resolve;
+                request.onerror = () => reject(request.error);
+            });
+            if (photoUrls.has(key)) {
+                const old = photoUrls.get(key);
+                if (old && typeof old === 'string' && old.startsWith('blob:')) URL.revokeObjectURL(old);
+                photoUrls.delete(key);
+            }
+            renderApp();
+            if (!document.getElementById('fullModal').classList.contains('hidden')) renderFullTableRows();
+            if (storage && firestore && firestoreDocRef) {
+                try { const sRef = storageRef(storage, `images/${appId}/${key}`); await deleteObject(sRef).catch(()=>{}); } catch(e){}
+                try { await updateDoc(firestoreDocRef, { [`photos.${key}`]: null, updatedAt: serverTimestamp() }); } catch(e){}
+            }
+        };
+
+        window.openFullModal = function() { populateFlatFilter(); renderFullTableRows(); document.getElementById('fullModal').classList.remove('hidden'); };
+        window.closeFullModal = function() { document.getElementById('fullModal').classList.add('hidden'); };
+        window.printFullTable = function() { window.print(); };
+        window.manualSaveData = async function() { await persistStatuses(); const toast = document.getElementById('saveToast'); toast.classList.remove('hidden'); setTimeout(() => toast.classList.add('hidden'), 3000); };
+
+        window.addEventListener('storage', (e) => {
+            if (e.key === storageKey) {
+                try {
+                    appData = loadSavedData();
+                    renderApp();
+                    if (!document.getElementById('fullModal').classList.contains('hidden')) renderFullTableRows();
+                    debug('Synced across tabs via localStorage event');
+                } catch (err) { console.warn('storage event load failed', err); }
+            }
+        });
+
+        async function init() {
+            debug('Initializing...');
+            await loadPhotoUrls();
+            renderApp();
+            try {
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                firestore = getFirestore(app);
+                try { await enableIndexedDbPersistence(firestore); debug('Firestore persistence enabled'); } catch(err) { console.warn('Could not enable persistence', err); }
+
+                storage = getStorage(app);
+                if (typeof __firebase_custom_token !== 'undefined' && __firebase_custom_token) await signInWithCustomToken(auth, __firebase_custom_token); else await signInAnonymously(auth);
+                firestoreDocRef = doc(firestore, 'artifacts', appId, 'public', 'data', 'miri_work_records_v2');
+
+                firestoreUnsubscribe = onSnapshot(firestoreDocRef, (docSnap) => {
+                    if (!docSnap.exists()) {
+                        debug('No remote doc yet');
+                        setDoc(firestoreDocRef, { roomsMap: buildRoomsMapForWrite(), photos: {}, updatedAt: serverTimestamp() }, { merge: true }).catch(()=>{});
+                        return;
+                    }
+                    const data = docSnap.data();
+                    if (data?.roomsMap) mergeRemoteRoomsMap(data.roomsMap);
+                    if (data?.photos) applyRemotePhotos(data.photos);
+                    debug('Remote update received');
+                }, (err) => { console.warn('Firestore snapshot listener error:', err); debug('Snapshot error'); });
+
+                const snap = await getDoc(firestoreDocRef);
+                if (snap.exists()) {
+                    const data = snap.data();
+                    if (data?.roomsMap) mergeRemoteRoomsMap(data.roomsMap);
+                    if (data?.photos) applyRemotePhotos(data.photos);
+                    debug('Initial remote merge done');
+                } else {
+                    await setDoc(firestoreDocRef, { roomsMap: buildRoomsMapForWrite(), photos: {}, updatedAt: serverTimestamp() }, { merge: true });
+                    debug('Pushed initial snapshot to server');
+                }
+            } catch (e) {
+                console.log('Firebase offline/local mode active or init failed:', e);
+                debug('Firebase init failed');
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>
